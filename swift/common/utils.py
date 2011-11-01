@@ -19,17 +19,14 @@ import errno
 import fcntl
 import os
 import pwd
-import signal
 import sys
 import time
-import mimetools
 from hashlib import md5
 from random import shuffle
 from urllib import quote
 from contextlib import contextmanager
 import ctypes
 import ctypes.util
-import struct
 from ConfigParser import ConfigParser, NoSectionError, NoOptionError, \
     RawConfigParser
 from optparse import OptionParser
@@ -169,16 +166,17 @@ def normalize_timestamp(timestamp):
     return "%016.05f" % (float(timestamp))
 
 
-def mkdirs(path):
+def mkdirs(path, mode=0755):
     """
     Ensures the path is a directory or makes it if not. Errors if the path
     exists but is a file or on permissions failure.
 
     :param path: path to create
+    :param mode: permission to create directory.
     """
     if not os.path.isdir(path):
         try:
-            os.makedirs(path)
+            os.makedirs(path, mode=mode)
         except OSError, err:
             if err.errno != errno.EEXIST or not os.path.isdir(path):
                 raise
@@ -883,23 +881,29 @@ def search_tree(root, glob_match, ext):
     return sorted(found_files)
 
 
-def write_file(path, contents):
+def write_file(path,
+               contents,
+               perm_file=0644,
+               perm_dir=0755):
     """Write contents to file at path
 
     :param path: any path, subdirs will be created as needed
     :param contents: data to write to file, will be converted to string
-
+    :param perm_file: permission of the created file.
+    :param perm_dir: permission of the created directory.
     """
     dirname, name = os.path.split(path)
     if not os.path.exists(dirname):
         try:
-            os.makedirs(dirname)
+            os.makedirs(dirname, mode=perm_dir)
         except OSError, err:
             if err.errno == errno.EACCES:
                 sys.exit('Unable to create %s.  Running as '
                          'non-root?' % dirname)
     with open(path, 'w') as f:
         f.write('%s' % contents)
+
+    os.chmod(path, perm_file)
 
 
 def remove_file(path):
