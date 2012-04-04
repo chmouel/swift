@@ -394,7 +394,8 @@ class TestSwift3(unittest.TestCase):
     def _check_acl(self, owner, resp):
         dom = xml.dom.minidom.parseString("".join(resp))
         self.assertEquals(dom.firstChild.nodeName, 'AccessControlPolicy')
-        name = dom.getElementsByTagName('Permission')[0].childNodes[0].nodeValue
+        perm = dom.getElementsByTagName('Permission')[0]
+        name = perm.childNodes[0].nodeValue
         self.assertEquals(name, 'FULL_CONTROL')
         name = dom.getElementsByTagName('ID')[0].childNodes[0].nodeValue
         self.assertEquals(name, owner)
@@ -476,8 +477,10 @@ class TestSwift3(unittest.TestCase):
         req = Request.blank('/bucket/object',
                             environ={'REQUEST_METHOD': 'PUT'},
                             headers={'Authorization': 'AWS test:tester:hmac',
-                                     'x-amz-storage-class': 'REDUCED_REDUNDANCY',
-                                     'Content-MD5': 'Gyz1NfJ3Mcl0NDZFo5hTKA=='})
+                                     'x-amz-storage-class':
+                                         'REDUCED_REDUNDANCY',
+                                     'Content-MD5':
+                                         'Gyz1NfJ3Mcl0NDZFo5hTKA=='})
         req.date = datetime.now()
         req.content_type = 'text/plain'
         resp = local_app(req.environ, local_app.app.do_start_response)
@@ -486,6 +489,45 @@ class TestSwift3(unittest.TestCase):
         headers = dict(local_app.app.response_args[1])
         self.assertEquals(headers['ETag'],
                           "\"%s\"" % local_app.app.response_headers['etag'])
+
+    def test_object_PUT_bad_content_md5(self):
+        local_app = swift3.filter_factory({})(FakeAppObject(201))
+        req = Request.blank('/bucket/object',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Authorization': 'AWS test:tester:hmac',
+                                     'x-amz-storage-class':
+                                         'REDUCED_REDUNDANCY',
+                                     'Content-MD5':
+                                         'Foo Bar'})
+        req.date = datetime.now()
+        req.content_type = 'text/plain'
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '400')
+
+        local_app = swift3.filter_factory({})(FakeAppObject(201))
+        req = Request.blank('/bucket/object',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Authorization': 'AWS test:tester:hmac',
+                                     'x-amz-storage-class':
+                                         'REDUCED_REDUNDANCY',
+                                     'Content-MD5': ''})
+        req.date = datetime.now()
+        req.content_type = 'text/plain'
+
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '400')
+
+        local_app = swift3.filter_factory({})(FakeAppObject(201))
+        req = Request.blank('/bucket/object',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Authorization': 'AWS test:tester:hmac',
+                                     'x-amz-storage-class':
+                                         'REDUCED_REDUNDANCY',
+                                     'Content-MD5': '\07'})
+        req.date = datetime.now()
+        req.content_type = 'text/plain'
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '403')
 
     def test_object_PUT_headers(self):
         class FakeApp(object):
@@ -581,10 +623,10 @@ class TestSwift3(unittest.TestCase):
                 {'Content-Type': None,
                  'Date': 'Tue, 12 Jul 2011 10:52:57 +0000'})
 
-        req1 = Request.blank('/', headers=
-                {'Content-Type': None, 'X-Amz-Something': 'test'})
-        req2 = Request.blank('/', headers=
-                {'Content-Type': '', 'X-Amz-Something': 'test'})
+        headers = {'Content-Type': None, 'X-Amz-Something': 'test'}
+        req1 = Request.blank('/', headers=headers)
+        headers = {'Content-Type': '', 'X-Amz-Something': 'test'}
+        req2 = Request.blank('/', headers=headers)
         req3 = Request.blank('/', headers={'X-Amz-Something': 'test'})
 
         self.assertEquals(swift3.canonical_string(req1),

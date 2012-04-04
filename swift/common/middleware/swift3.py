@@ -55,6 +55,7 @@ import rfc822
 import hmac
 import base64
 import errno
+import binascii
 from xml.sax.saxutils import escape as xml_escape
 import urlparse
 
@@ -87,6 +88,8 @@ def get_err_response(code):
             (400, 'Invalid Argument'),
         'InvalidBucketName':
             (400, 'The specified bucket is not valid'),
+        'InvalidDigest':
+            (400, 'Bad Request'),
         'InvalidURI':
             (400, 'Could not parse the specified URI'),
         'NoSuchBucket':
@@ -374,7 +377,15 @@ class ObjectController(WSGIContext):
                 del env[key]
                 env['HTTP_X_OBJECT_META_' + key[16:]] = value
             elif key == 'HTTP_CONTENT_MD5':
-                env['HTTP_ETAG'] = value.decode('base64').encode('hex')
+                if not value:
+                    return get_err_response('InvalidDigest')
+                try:
+                    encoded = value.decode('base64').encode('hex')
+                except binascii.Error:
+                    return get_err_response('InvalidDigest')
+                if not encoded:
+                    return get_err_response('SignatureDoesNotMatch')
+                env['HTTP_ETAG'] = encoded
             elif key == 'HTTP_X_AMZ_COPY_SOURCE':
                 env['HTTP_X_COPY_FROM'] = value
 
@@ -386,6 +397,8 @@ class ObjectController(WSGIContext):
                 return get_err_response('AccessDenied')
             elif status == 404:
                 return get_err_response('NoSuchBucket')
+            elif status == 422:
+                return get_err_response('InvalidDigest')
             else:
                 return get_err_response('InvalidURI')
 
