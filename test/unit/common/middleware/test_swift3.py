@@ -491,25 +491,22 @@ class TestSwift3(unittest.TestCase):
                           "\"%s\"" % local_app.app.response_headers['etag'])
 
     def test_object_PUT_bad_content_md5(self):
+        # Test totally wrong MD5
         local_app = swift3.filter_factory({})(FakeAppObject(201))
         req = Request.blank('/bucket/object',
                             environ={'REQUEST_METHOD': 'PUT'},
                             headers={'Authorization': 'AWS test:tester:hmac',
-                                     'x-amz-storage-class':
-                                         'REDUCED_REDUNDANCY',
-                                     'Content-MD5':
-                                         'Foo Bar'})
+                                     'Content-MD5': 'Foo Bar'})
         req.date = datetime.now()
         req.content_type = 'text/plain'
         resp = local_app(req.environ, local_app.app.do_start_response)
         self.assertEquals(local_app.app.response_args[0].split()[0], '400')
 
+        # Test empty Content-MD5
         local_app = swift3.filter_factory({})(FakeAppObject(201))
         req = Request.blank('/bucket/object',
                             environ={'REQUEST_METHOD': 'PUT'},
                             headers={'Authorization': 'AWS test:tester:hmac',
-                                     'x-amz-storage-class':
-                                         'REDUCED_REDUNDANCY',
                                      'Content-MD5': ''})
         req.date = datetime.now()
         req.content_type = 'text/plain'
@@ -517,12 +514,11 @@ class TestSwift3(unittest.TestCase):
         resp = local_app(req.environ, local_app.app.do_start_response)
         self.assertEquals(local_app.app.response_args[0].split()[0], '400')
 
+        # Test a md5 that comes back as empty.
         local_app = swift3.filter_factory({})(FakeAppObject(201))
         req = Request.blank('/bucket/object',
                             environ={'REQUEST_METHOD': 'PUT'},
                             headers={'Authorization': 'AWS test:tester:hmac',
-                                     'x-amz-storage-class':
-                                         'REDUCED_REDUNDANCY',
                                      'Content-MD5': '\07'})
         req.date = datetime.now()
         req.content_type = 'text/plain'

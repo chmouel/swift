@@ -89,7 +89,7 @@ def get_err_response(code):
         'InvalidBucketName':
             (400, 'The specified bucket is not valid'),
         'InvalidDigest':
-            (400, 'Bad Request'),
+            (400, 'The Content-MD5 you specified was invalid.'),
         'InvalidURI':
             (400, 'Could not parse the specified URI'),
         'NoSuchBucket':
