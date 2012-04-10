@@ -373,6 +373,31 @@ class TestSwift3(unittest.TestCase):
         resp = local_app(req.environ, local_app.app.do_start_response)
         self.assertEquals(local_app.app.response_args[0].split()[0], '200')
 
+    def test_bucket_PUT_invalid_content_length(self):
+        local_app = swift3.filter_factory({})(FakeAppBucket(201))
+        req = Request.blank('/bucket',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Content-Length': '-1',
+                                     'Authorization': 'AWS test:tester:hmac'})
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '400')
+
+        local_app = swift3.filter_factory({})(FakeAppBucket(400))
+        req = Request.blank('/bucket',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Content-Length': '\x07',
+                                     'Authorization': 'AWS test:tester:hmac'})
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '400')
+
+        local_app = swift3.filter_factory({})(FakeAppBucket(400))
+        req = Request.blank('/bucket',
+                            environ={'REQUEST_METHOD': 'PUT'},
+                            headers={'Content-Length': '',
+                                     'Authorization': 'AWS test:tester:hmac'})
+        resp = local_app(req.environ, local_app.app.do_start_response)
+        self.assertEquals(local_app.app.response_args[0].split()[0], '400')
+
     def test_bucket_DELETE_error(self):
         code = self._test_method_error(FakeAppBucket, 'DELETE', '/bucket', 401)
         self.assertEquals(code, 'AccessDenied')

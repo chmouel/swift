@@ -70,11 +70,12 @@ from swift.common.wsgi import WSGIContext
 MAX_BUCKET_LISTING = 1000
 
 
-def get_err_response(code):
+def get_err_response(code, return_code=True):
     """
     Given an HTTP response code, create a properly formatted xml error response
 
     :param code: error code
+    :param return_code: return or not a code (default: True)
     :returns: webob.response object
     """
     error_table = {
@@ -97,15 +98,19 @@ def get_err_response(code):
         'SignatureDoesNotMatch':
             (403, 'The calculated request signature does not match '\
             'your provided one'),
+        'BadRequest':
+            (400, 'Bad Request'),
         'NoSuchKey':
             (404, 'The resource you requested does not exist')}
 
     resp = Response(content_type='text/xml')
     resp.status = error_table[code][0]
     resp.body = error_table[code][1]
-    resp.body = '<?xml version="1.0" encoding="UTF-8"?>\r\n<Error>\r\n  ' \
-                '<Code>%s</Code>\r\n  <Message>%s</Message>\r\n</Error>\r\n' \
-                 % (code, error_table[code][1])
+    resp.body = '<?xml version="1.0" encoding="UTF-8"?>\r\n<Error>\r\n  '
+    if return_code:
+        resp.body += "<Code>%s</Code>\r\n  " % (code)
+    resp.body += '<Message>%s</Message>\r\n</Error>\r\n' % \
+        (error_table[code][1])
     return resp
 
 
@@ -277,7 +282,6 @@ class BucketController(WSGIContext):
         """
         body_iter = self._app_call(env)
         status = self._get_status_int()
-
         if status != 201:
             if status == 401:
                 return get_err_response('AccessDenied')
@@ -464,6 +468,13 @@ class Swift3Middleware(object):
                 req.headers['Authorization'].split(' ')[-1].rsplit(':', 1)
         except Exception:
             return get_err_response('InvalidArgument')(env, start_response)
+
+        if (type(req.content_length) is int and
+            req.content_length < 0) or \
+            (type(req.content_length) is str and
+             not req.content_length.isdigit()):
+            response = get_err_response('BadRequest', return_code=False)
+            return response(env, start_response)
 
         try:
             controller, path_parts = self.get_controller(req.path)
