@@ -200,6 +200,13 @@ class TestAuthorize(unittest.TestCase):
         self._check_authenticate(account='BLAN_a',
                                  exception=HTTP_FORBIDDEN)
 
+    def test_authorize_succeeds_for_tenant_name(self):
+        account_name = 'accountName'
+        roles = self.test_auth.operator_roles.split(',')
+        identity = self._get_identity(roles=roles, tenant_name=account_name)
+        path = '/v1/%s%s' % (self.test_auth.reseller_prefix, account_name)
+        self._check_authenticate(path=path, identity=identity)
+
     def test_authorize_succeeds_for_reseller_admin(self):
         roles = [self.test_auth.reseller_admin_role]
         identity = self._get_identity(roles=roles)

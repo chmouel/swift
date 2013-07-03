@@ -176,6 +176,22 @@ class KeystoneAuth(object):
         except ValueError:
             return HTTPNotFound(request=req)
 
+        # allow access via tenant_name
+        base_account = account.replace(self.reseller_prefix, '')
+        (tenant_id, tenant_name) = env_identity['tenant']
+        if base_account == tenant_name:
+            # rewrite account to AUTH_tenantId
+            account = "%s%s" % (self.reseller_prefix,
+                                env_identity['tenant'][0])
+            other = ''
+            if part[2] is not None:
+                other = "/" + '/'.join(part[2:])
+
+            # rewrite the PATH_INFO to AUTH_tenantId
+            req.environ['PATH_INFO'] = "/%s%s%s" % (self.reseller_prefix,
+                                                    env_identity['tenant'][0],
+                                                    other)
+
         user_roles = [r.lower() for r in env_identity.get('roles', [])]
 
         # Give unconditional access to a user with the reseller_admin
